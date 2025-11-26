@@ -1,0 +1,5 @@
+{
+  "name": "Digital kaleidoscope",
+  "description": "A relaxing, interactive generative art application where users create symmetrical patterns on a digital canvas using vanilla JavaScript.",
+  "requestFramePermissions": []
+}

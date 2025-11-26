@@ -1,0 +1,1 @@
+// This file is deprecated. The app now runs entirely in index.html.

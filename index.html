@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Digital Kaleidoscope</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563; 
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #030712; /* gray-950 */
+            color: #f3f4f6; /* gray-100 */
+            overflow: hidden; /* Prevent body scroll in full mode */
+        }
+        
+        main {
+            flex: 1;
+            position: relative;
+        }
+
+        /* Prevent scrolling when touching the canvas on mobile */
+        canvas {
+            touch-action: none;
+            cursor: crosshair;
+            transition: border-radius 0.3s ease, transform 0.3s ease;
+        }
+        
+        /* Shape Classes */
+        .shape-circle {
+            border-radius: 50%;
+        }
+        .shape-square {
+            border-radius: 1rem; /* rounded-2xl */
+        }
+        .shape-triangle {
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            border-radius: 0;
+            /* Triangle doesn't play well with CSS borders, so we remove them via JS/CSS toggle if needed, 
+               or just accept the border is clipped */
+        }
+        .shape-full {
+            border-radius: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #c084fc;
+            cursor: pointer;
+            margin-top: -6px; 
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
+
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239CA3AF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 0.65em auto;
+        }
+
+        .prose h3 {
+            color: #d8b4fe; /* purple-300 */
+            font-weight: 600;
+            font-size: 1.125rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .prose p {
+            margin-bottom: 1rem;
+            color: #9ca3af; /* gray-400 */
+            line-height: 1.625;
+        }
+        .prose strong {
+            color: #e5e7eb; /* gray-200 */
+        }
+    </style>
+</head>
+<body class="selection:bg-purple-500 selection:text-white">
+
+    <!-- Header -->
+    <header id="main-header" class="glass-panel sticky top-0 z-40 border-b border-white/10 transition-all duration-500 ease-in-out transform">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-center h-16 relative">
+                <!-- Logo -->
+                <div class="flex flex-col justify-center items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/><path d="m14.83 9.17-5.66 5.66"/><path d="m14.83 14.83-5.66-5.66"/><path d="m4.93 19.07 14.14-14.14"/></svg>
+                        </div>
+                        <span class="font-bold text-xl text-white tracking-wider">KALEIDO</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Toggle UI Button -->
+    <button id="toggle-ui-btn" class="fixed top-4 right-4 z-50 p-2 rounded-full bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 border border-white/10 transition-all backdrop-blur-md group" title="Toggle Interface">
+        <svg id="eye-open" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:scale-110 transition-transform"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg id="eye-closed" class="hidden group-hover:scale-110 transition-transform" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+    </button>
+
+    <!-- Main Content -->
+    <main class="w-full flex flex-col items-center justify-center relative">
+        
+        <!-- Canvas Container -->
+        <!-- In 'Full' mode, this becomes absolute inset-0. In other modes, it's relative. -->
+        <div id="canvas-container" class="relative z-0 flex items-center justify-center transition-all duration-500">
+            <div id="glow-bg" class="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full blur-2xl opacity-20 pointer-events-none transition-opacity duration-500"></div>
+            <canvas id="canvas" class="relative bg-black shadow-2xl border-4 border-gray-800 cursor-crosshair shape-circle"></canvas>
+            
+            <div id="instruction-text" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/30 text-xs font-medium pointer-events-none select-none whitespace-nowrap">
+                Draw to create
+            </div>
+        </div>
+
+        <!-- Controls Bar -->
+        <div id="controls-panel" class="glass-panel absolute top-4 md:top-8 p-3 md:p-4 rounded-xl flex flex-wrap gap-4 md:gap-6 items-center justify-center shadow-2xl z-20 max-w-[95%] transition-all duration-500 ease-in-out transform">
+            
+            <!-- Color Picker -->
+            <div class="flex items-center gap-3">
+                <div class="relative overflow-hidden w-9 h-9 rounded-full ring-2 ring-white/20 hover:ring-white/40 transition-all">
+                    <input type="color" id="color-picker" value="#c084fc" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-0 cursor-pointer">
+                </div>
+            </div>
+
+            <div class="h-8 w-px bg-white/10 hidden sm:block"></div>
+
+            <!-- Brush Size -->
+            <div class="flex flex-col gap-1 w-24 md:w-28">
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span class="font-semibold uppercase tracking-wider">Size</span>
+                    <span id="size-val">4px</span>
+                </div>
+                <input type="range" id="brush-size" min="1" max="40" value="4" class="w-full">
+            </div>
+
+            <!-- Symmetry -->
+            <div class="flex flex-col gap-1 w-24 md:w-28">
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span class="font-semibold uppercase tracking-wider">Symmetry</span>
+                    <span id="sym-val">8</span>
+                </div>
+                <input type="range" id="symmetry-count" min="2" max="24" value="8" step="1" class="w-full">
+            </div>
+
+            <div class="h-8 w-px bg-white/10 hidden md:block"></div>
+
+            <!-- Shape Selector -->
+             <div class="flex flex-col gap-1 w-24 md:w-28">
+                <div class="flex justify-between text-xs text-gray-400">
+                    <span class="font-semibold uppercase tracking-wider">Format</span>
+                </div>
+                <select id="shape-select" class="w-full bg-gray-900/50 text-xs text-gray-200 rounded py-1 pl-2 pr-6 border border-gray-700 outline-none focus:border-purple-500 cursor-pointer hover:bg-gray-800 transition-colors">
+                    <option value="circle">Circle</option>
+                    <option value="square">Square</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="full">Full Screen</option>
+                </select>
+            </div>
+
+            <div class="h-8 w-px bg-white/10 hidden lg:block"></div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2">
+                <button id="clear-btn" title="Clear Canvas" class="p-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+                <button id="download-btn" title="Save Art" class="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:text-purple-300 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer id="main-footer" class="bg-gray-950 border-t border-white/5 text-gray-400 z-30 transition-all duration-500 ease-in-out transform">
+        <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row items-center justify-between gap-4">
+             <p class="text-xs text-gray-600">
+                &copy; 2024 Digital Kaleidoscope
+            </p>
+            <div class="flex gap-6 text-xs text-gray-500">
+                <button id="terms-link" class="hover:text-purple-400 transition-colors focus:outline-none">Terms & Conditions</button>
+                <button id="privacy-link" class="hover:text-purple-400 transition-colors focus:outline-none">Privacy Policy</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Info Modal -->
+    <div id="modal-overlay" class="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm hidden flex items-center justify-center opacity-0 transition-opacity duration-300">
+        <div id="modal-content" class="bg-gray-900/95 border border-white/10 rounded-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col shadow-2xl transform scale-95 transition-transform duration-300">
+            <!-- Header -->
+            <div class="p-6 border-b border-white/10 flex justify-between items-center bg-gray-900/50">
+                <h2 id="modal-title" class="text-2xl font-bold text-white tracking-wide"></h2>
+                <button id="modal-close-x" class="text-gray-400 hover:text-white transition-colors p-1 rounded-md hover:bg-white/5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div id="modal-body" class="p-6 overflow-y-auto prose">
+                <!-- Content injected here -->
+            </div>
+
+            <!-- Footer -->
+            <div class="p-6 border-t border-white/10 flex justify-center bg-gray-900/50">
+                <button id="modal-action-btn" class="px-8 py-3 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold tracking-wide hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg hover:shadow-purple-500/25 active:scale-95">
+                    Got it, let's play
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vanilla JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // UI References
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById('canvas-container');
+            const main = document.querySelector('main');
+            const glowBg = document.getElementById('glow-bg');
+            const instructionText = document.getElementById('instruction-text');
+            
+            // UI Toggle References
+            const toggleBtn = document.getElementById('toggle-ui-btn');
+            const mainHeader = document.getElementById('main-header');
+            const controlsPanel = document.getElementById('controls-panel');
+            const mainFooter = document.getElementById('main-footer');
+            const eyeOpen = document.getElementById('eye-open');
+            const eyeClosed = document.getElementById('eye-closed');
+
+            // Modal References
+            const modalOverlay = document.getElementById('modal-overlay');
+            const modalContent = document.getElementById('modal-content');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalCloseX = document.getElementById('modal-close-x');
+            const modalActionBtn = document.getElementById('modal-action-btn');
+            const termsLink = document.getElementById('terms-link');
+            const privacyLink = document.getElementById('privacy-link');
+
+            // Controls
+            const colorPicker = document.getElementById('color-picker');
+            const brushSizeInput = document.getElementById('brush-size');
+            const symmetryInput = document.getElementById('symmetry-count');
+            const shapeSelect = document.getElementById('shape-select');
+            const clearBtn = document.getElementById('clear-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            
+            // Value Displays
+            const sizeVal = document.getElementById('size-val');
+            const symVal = document.getElementById('sym-val');
+
+            // State
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            
+            // Configuration
+            let color = colorPicker.value;
+            let lineWidth = parseInt(brushSizeInput.value);
+            let symmetryLines = parseInt(symmetryInput.value);
+            let currentShape = 'circle';
+
+            // --- Modal Logic ---
+            
+            const termsContent = `
+                <h3>1. Introduction</h3>
+                <p>Welcome to Digital Kaleidoscope ("we," "our," or "us"). By using this website, you agree to these Terms and Conditions. This is an interactive art tool for entertainment.</p>
+                
+                <h3>2. Use of Service</h3>
+                <p>You are granted a limited license to use Digital Kaleidoscope for personal, non-commercial use. Patterns and images are created locally in your browser.</p>
+                
+                <h3>3. Intellectual Property</h3>
+                <p>The code and design belong to the developers. However, the artwork you create belongs to you. You are free to save and share your creations.</p>
+                
+                <h3>4. Disclaimer</h3>
+                <p>This service is provided "as is" without warranties. We are not responsible for any data loss occurring while using the browser-based canvas.</p>
+            `;
+
+            const privacyContent = `
+                <h3>1. Commitment to Privacy</h3>
+                <p>Your privacy is important. <strong>We do not collect any personal data.</strong></p>
+                
+                <h3>2. Data Collection</h3>
+                <p>We do not collect, store, or process personal information. No account creation is required, and we do not track usage behavior on servers.</p>
+                
+                <h3>3. Cookies</h3>
+                <p>This website does not use cookies, third-party tracking scripts, analytics, or advertising networks.</p>
+                
+                <h3>4. Local Processing</h3>
+                <p>All art generation happens locally in your browser using JavaScript. Your drawings are never transmitted to a remote server.</p>
+            `;
+
+            function openModal(title, content) {
+                modalTitle.textContent = title;
+                modalBody.innerHTML = content;
+                modalOverlay.classList.remove('hidden');
+                
+                // Trigger reflow
+                void modalOverlay.offsetWidth;
+                
+                modalOverlay.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }
+
+            function closeModal() {
+                modalOverlay.classList.add('opacity-0');
+                modalContent.classList.remove('scale-100');
+                modalContent.classList.add('scale-95');
+                
+                setTimeout(() => {
+                    modalOverlay.classList.add('hidden');
+                }, 300);
+            }
+
+            termsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openModal('Terms and Conditions', termsContent);
+            });
+
+            privacyLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                openModal('Privacy Policy', privacyContent);
+            });
+
+            modalCloseX.addEventListener('click', closeModal);
+            modalActionBtn.addEventListener('click', closeModal);
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) closeModal();
+            });
+
+
+            // --- UI Toggle Logic ---
+            toggleBtn.addEventListener('click', () => {
+                const isHidden = mainHeader.classList.contains('-translate-y-full');
+
+                if (isHidden) {
+                    // Show
+                    mainHeader.classList.remove('-translate-y-full', 'opacity-0');
+                    controlsPanel.classList.remove('opacity-0', '-translate-y-full', 'pointer-events-none');
+                    mainFooter.classList.remove('opacity-0', 'translate-y-full');
+                    
+                    eyeOpen.classList.remove('hidden');
+                    eyeClosed.classList.add('hidden');
+                } else {
+                    // Hide
+                    mainHeader.classList.add('-translate-y-full', 'opacity-0');
+                    // We move controls up and out, or just fade. Let's move them up slightly to look like they are leaving
+                    controlsPanel.classList.add('opacity-0', '-translate-y-full', 'pointer-events-none');
+                    mainFooter.classList.add('opacity-0', 'translate-y-full');
+
+                    eyeOpen.classList.add('hidden');
+                    eyeClosed.classList.remove('hidden');
+                }
+            });
+
+            // --- Initialization ---
+
+            function resizeCanvas() {
+                // Determine dimensions based on shape
+                let width, height;
+
+                if (currentShape === 'full') {
+                    // Full screen mode
+                    width = main.clientWidth;
+                    height = main.clientHeight; // Fill the main area
+                    
+                    // Style adjustments for full mode
+                    container.style.position = 'absolute';
+                    container.style.inset = '0';
+                    container.style.width = '100%';
+                    container.style.height = '100%';
+                    container.style.zIndex = '0'; // Behind controls
+                    
+                    canvas.classList.add('shape-full');
+                    canvas.classList.remove('shape-circle', 'shape-square', 'shape-triangle', 'border-4', 'border-gray-800', 'shadow-2xl');
+                    glowBg.style.display = 'none';
+                    instructionText.style.display = 'none';
+
+                } else {
+                    // Shape modes (Circle, Square, Triangle)
+                    const size = Math.min(window.innerWidth - 32, window.innerHeight - 200, 600);
+                    width = size;
+                    height = size;
+                    
+                    // Reset container styles
+                    container.style.position = 'relative';
+                    container.style.inset = 'auto';
+                    container.style.width = 'auto';
+                    container.style.height = 'auto';
+                    container.style.zIndex = '0';
+                    
+                    // Remove full class
+                    canvas.classList.remove('shape-full');
+                    
+                    // Add standard styles
+                    canvas.classList.add('border-4', 'border-gray-800', 'shadow-2xl');
+                    glowBg.style.display = 'block';
+                    instructionText.style.display = 'block';
+
+                    // Apply shape class
+                    canvas.className = `relative bg-black shadow-2xl border-4 border-gray-800 cursor-crosshair shape-${currentShape}`;
+                }
+
+                // Update canvas dimension attributes
+                // Note: Changing width/height clears the canvas automatically
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Re-apply context settings after resize/clear
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineWidth;
+            }
+
+            // Initial setup
+            resizeCanvas();
+            window.addEventListener('resize', () => {
+                // Debounce resize to prevent performance issues
+                clearTimeout(window.resizeTimer);
+                window.resizeTimer = setTimeout(resizeCanvas, 100);
+            });
+
+            // --- Drawing Logic ---
+
+            function getCoordinates(e) {
+                const rect = canvas.getBoundingClientRect();
+                let clientX, clientY;
+                
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+
+            function startDrawing(e) {
+                isDrawing = true;
+                const coords = getCoordinates(e);
+                lastX = coords.x;
+                lastY = coords.y;
+                
+                // Hide instructions on first draw
+                if(instructionText) instructionText.style.opacity = '0';
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+                ctx.beginPath(); 
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                const coords = getCoordinates(e);
+                const x = coords.x;
+                const y = coords.y;
+                
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+
+                const angle = (Math.PI * 2) / symmetryLines;
+
+                for (let i = 0; i < symmetryLines; i++) {
+                    ctx.rotate(angle);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(lastX - cx, lastY - cy);
+                    ctx.lineTo(x - cx, y - cy);
+                    ctx.stroke();
+
+                    ctx.save();
+                    ctx.scale(1, -1);
+                    ctx.beginPath();
+                    ctx.moveTo(lastX - cx, lastY - cy);
+                    ctx.lineTo(x - cx, y - cy);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                ctx.restore();
+
+                lastX = x;
+                lastY = y;
+            }
+
+            // --- Event Listeners ---
+
+            // Mouse
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+
+            // Touch
+            canvas.addEventListener('touchstart', (e) => {
+                startDrawing(e);
+            });
+            canvas.addEventListener('touchmove', (e) => {
+                draw(e);
+            });
+            canvas.addEventListener('touchend', stopDrawing);
+
+            // --- Controls Logic ---
+
+            colorPicker.addEventListener('input', (e) => {
+                color = e.target.value;
+                ctx.strokeStyle = color;
+            });
+
+            brushSizeInput.addEventListener('input', (e) => {
+                lineWidth = e.target.value;
+                sizeVal.textContent = lineWidth + 'px';
+                ctx.lineWidth = lineWidth;
+            });
+
+            symmetryInput.addEventListener('input', (e) => {
+                symmetryLines = parseInt(e.target.value);
+                symVal.textContent = symmetryLines;
+            });
+
+            shapeSelect.addEventListener('change', (e) => {
+                currentShape = e.target.value;
+                // Add a small confirmation/transition effect before clearing
+                resizeCanvas();
+            });
+
+            function clearCanvas() {
+                // Fade out effect
+                canvas.style.transition = 'opacity 0.2s';
+                canvas.style.opacity = '0';
+                setTimeout(() => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    canvas.style.opacity = '1';
+                }, 200);
+            }
+
+            function downloadArt() {
+                const link = document.createElement('a');
+                link.download = 'kaleidoscope-' + currentShape + '-' + Date.now() + '.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            }
+
+            clearBtn.addEventListener('click', clearCanvas);
+            downloadBtn.addEventListener('click', downloadArt);
+        });
+    </script>
+</body>
+</html>
